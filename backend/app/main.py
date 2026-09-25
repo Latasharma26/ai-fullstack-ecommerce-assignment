@@ -23,6 +23,48 @@ app.add_middleware(
 )
 
 
+@app.on_event("startup")
+def init_db_on_startup():
+    """
+    Ensures Alembic migrations are executed on application boot and
+    populates seed catalog if the database is fresh.
+    """
+    import logging
+    logger = logging.getLogger("app.startup")
+    try:
+        from alembic.config import Config
+        from alembic import command
+        alembic_cfg = Config("alembic.ini")
+        command.upgrade(alembic_cfg, "head")
+        logger.info("Production Alembic migration applied successfully.")
+    except Exception as exc:
+        logger.warning("Alembic upgrade notice: %s", exc)
+        # Fallback to direct DDL if alembic.ini is not in working dir
+        try:
+            from app.core.database import engine, Base
+            import app.models  # noqa: F401
+            Base.metadata.create_all(bind=engine)
+            logger.info("Direct SQLAlchemy metadata tables verified.")
+        except Exception as e2:
+            logger.error("Database schema creation failed: %s", e2)
+
+    # Seed initial products and demo accounts if catalog is empty
+    try:
+        from app.core.database import SessionLocal
+        from app.models.product import Product
+        db = SessionLocal()
+        try:
+            if db.query(Product).count() == 0:
+                logger.info("Empty database detected. Running initial seed...")
+                from seed import seed_database
+                seed_database()
+                logger.info("Initial seed completed.")
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.warning("Database seeding check notice: %s", exc)
+
+
 @app.get("/", tags=["General"])
 def root():
     return {
