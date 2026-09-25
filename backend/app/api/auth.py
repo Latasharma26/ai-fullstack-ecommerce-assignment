@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -45,18 +45,21 @@ def demo_login(
 ):
     """
     Quick one-click demo login for interview evaluations and local testing.
-    Disabled in production environments for security.
+    In production environments, restricted to pre-seeded evaluation accounts.
     """
     from app.core.config import settings
+    email_str = str(payload.email).lower()
     if settings.ENVIRONMENT == "production":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Demo login is disabled in production. Please sign in with Google OAuth.",
-        )
+        # Allow pre-seeded demo accounts for interview reviewer evaluation
+        if email_str not in ["customer@shopai.com", "admin@shopai.com"]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Demo login for unseeded emails is disabled in production. Please use customer@shopai.com or admin@shopai.com, or sign in with Google OAuth.",
+            )
 
     user = AuthService.get_or_create_user(
         db=db,
-        email=str(payload.email),
+        email=email_str,
         name=None,
     )
     return AuthService.create_user_token(user)
