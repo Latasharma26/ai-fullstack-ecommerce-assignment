@@ -14,9 +14,15 @@ app = FastAPI(
 )
 
 # Configure CORS
+cors_origins = list(settings.CORS_ORIGINS) if isinstance(settings.CORS_ORIGINS, list) else [settings.CORS_ORIGINS]
+if settings.FRONTEND_URL and settings.FRONTEND_URL not in cors_origins:
+    cors_origins.append(settings.FRONTEND_URL)
+if "https://ai-fullstack-ecommerce-assignment.vercel.app" not in cors_origins:
+    cors_origins.append("https://ai-fullstack-ecommerce-assignment.vercel.app")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
